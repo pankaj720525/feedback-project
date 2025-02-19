@@ -1,0 +1,59 @@
+name: CI/CD Pipeline for Node.js
+
+on:
+  push:
+    branches:
+      - main  # Runs this workflow when code is pushed to the main branch
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Run Tests
+        run: npm test  # Ensure your project has tests configured
+
+      - name: Build the Application
+        run: npm run build  # Skip if not applicable
+
+  deploy:
+    needs: build  # Runs deployment only if the build job is successful
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Deploy to Server
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SERVER_IP: ${{ secrets.SERVER_IP }}
+          USERNAME: ${{ secrets.SERVER_USER }}
+        run: |
+          echo "$SSH_PRIVATE_KEY" > private_key.pem
+          chmod 600 private_key.pem
+          ssh -o StrictHostKeyChecking=no -i private_key.pem $USERNAME@$SERVER_IP << 'EOF'
+            cd /var/www/node-app  # Change to your server directory
+            git pull origin main
+            npm install
+            pm2 restart app.js  # Use PM2 to restart the app
+          EOF
